@@ -137,6 +137,7 @@
   .prow summary{ font-size:12px; color:var(--text-muted); cursor:pointer; }
   .roundhist{ margin-top:8px; display:flex; flex-direction:column; gap:4px; }
   .roundhist div{ font-size:12px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace; }
+  .adminpredline{ color:var(--accent) !important; margin:-2px 0 6px !important; }
   .empty{ text-align:center; padding:30px 10px; color:var(--text-muted); }
   .empty .big{ font-family:'Fraunces', serif; font-size:32px; color:var(--text); margin-bottom:6px; }
 
@@ -256,7 +257,7 @@
 
           <div class="checklist" id="pred-checklist"></div>
 
-          <button type="submit" class="btn" id="predict-submit">Guardar tu predicción</button>
+          <button type="submit" class="btn" id="predict-submit">Guardar esta ronda</button>
           <div class="formmsg" id="predict-msg"></div>
         </form>
       </div>
@@ -540,6 +541,11 @@
     PARTY_ORDER.forEach(function(p){ const v=(counts&&counts[p])||0; if (v>bv){ bv=v; best=p; } });
     return best;
   }
+  function topPartyWithSeats(counts){
+    let best=null, bv=-1;
+    PARTY_ORDER.forEach(function(p){ const v=(counts&&counts[p])||0; if (v>bv){ bv=v; best=p; } });
+    return { party: best, seats: bv<0?0:bv };
+  }
   function chamberAbsError(pred, actual){
     let err=0; PARTY_ORDER.forEach(function(p){ err += Math.abs((pred&&pred[p]||0) - (actual&&actual[p]||0)); });
     return err;
@@ -623,7 +629,7 @@
     const list = document.getElementById('participants-list');
     const sub = document.getElementById('participants-sub');
     sub.textContent = predictions.length
-      ? predictions.length+' persona'+(predictions.length===1?'':'s')+' ya '+(predictions.length===1?'ha':'han')+' enviado al menos una predicción.'
+      ? predictions.length+' persona'+(predictions.length===1?'':'s')+' ya '+(predictions.length===1?'ha':'han')+' enviado al menos una predicción.'+(canEdit?' Como administrador/a, ves además un resumen de cada ronda.':'')
       : 'Todavía nadie ha enviado su predicción.';
     if (!predictions.length){
       list.innerHTML = '<div class="empty"><div class="big">—</div>Sé la primera persona en participar.</div>';
@@ -638,7 +644,12 @@
       const rounds = p.rounds||[];
       const last = rounds.length ? rounds[rounds.length-1] : null;
       const hist = rounds.slice().reverse().map(function(r){
-        return '<div>'+fmtDate(r.submittedAt)+' — '+escapeHtml(r.title)+'</div>';
+        let line = '<div>'+fmtDate(r.submittedAt)+' — '+escapeHtml(r.title)+'</div>';
+        if (canEdit){
+          const cw = topPartyWithSeats(r.congressSeats), sw = topPartyWithSeats(r.senateSeats);
+          line += '<div class="adminpredline">Congreso: '+cw.party+' ('+cw.seats+') · Senado: '+sw.party+' ('+sw.seats+') · Participación '+r.participation+'% · Presidente/a: '+labelFor('president',r.president)+'</div>';
+        }
+        return line;
       }).join('');
       return '<div class="prow">'+
         '<div class="prowtop"><span>'+escapeHtml(p.name||'(sin nombre)')+'</span>'+
@@ -981,6 +992,7 @@
         document.getElementById('admin-panel').innerHTML = '';
       }
       renderPolls();
+      renderParticipants();
     });
   }
 })();
