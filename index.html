@@ -136,8 +136,13 @@
   .prow details{ margin-top:6px; }
   .prow summary{ font-size:12px; color:var(--text-muted); cursor:pointer; }
   .roundhist{ margin-top:8px; display:flex; flex-direction:column; gap:4px; }
-  .roundhist div{ font-size:12px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace; }
-  .adminpredline{ color:var(--accent) !important; margin:-2px 0 6px !important; }
+  .roundhist > div{ font-size:12px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace; }
+  .adminpredbars{ margin:2px 0 10px; }
+  .abarrow{ display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+  .abarlabel{ font-size:11px; color:var(--text-muted); width:56px; flex:none; font-family:'IBM Plex Mono',monospace; }
+  .pollstack.abar{ height:20px; }
+  .pollstack.abar .seg{ font-size:9.5px; }
+  .adminpredmeta{ font-size:11px; color:var(--accent); margin-top:2px; }
   .empty{ text-align:center; padding:30px 10px; color:var(--text-muted); }
   .empty .big{ font-family:'Fraunces', serif; font-size:32px; color:var(--text); margin-bottom:6px; }
 
@@ -546,6 +551,16 @@
     PARTY_ORDER.forEach(function(p){ const v=(counts&&counts[p])||0; if (v>bv){ bv=v; best=p; } });
     return { party: best, seats: bv<0?0:bv };
   }
+  function seatBarHTML(counts, total){
+    const segs = PARTY_ORDER.map(function(p){
+      const seats = (counts && counts[p]) || 0;
+      if (seats <= 0) return '';
+      const w = seats/total*100;
+      const label = w >= 6 ? seats : '';
+      return '<span class="seg" style="width:'+w+'%; background:'+PARTY_COLOR[p]+'; color:'+textColorFor(p)+'" title="'+p+': '+seats+' esc.">'+label+'</span>';
+    }).join('');
+    return '<div class="pollstack abar">'+segs+'</div>';
+  }
   function chamberAbsError(pred, actual){
     let err=0; PARTY_ORDER.forEach(function(p){ err += Math.abs((pred&&pred[p]||0) - (actual&&actual[p]||0)); });
     return err;
@@ -646,8 +661,11 @@
       const hist = rounds.slice().reverse().map(function(r){
         let line = '<div>'+fmtDate(r.submittedAt)+' — '+escapeHtml(r.title)+'</div>';
         if (canEdit){
-          const cw = topPartyWithSeats(r.congressSeats), sw = topPartyWithSeats(r.senateSeats);
-          line += '<div class="adminpredline">Congreso: '+cw.party+' ('+cw.seats+') · Senado: '+sw.party+' ('+sw.seats+') · Participación '+r.participation+'% · Presidente/a: '+labelFor('president',r.president)+'</div>';
+          line += '<div class="adminpredbars">'+
+            '<div class="abarrow"><span class="abarlabel">Congreso</span>'+seatBarHTML(r.congressSeats,350)+'</div>'+
+            '<div class="abarrow"><span class="abarlabel">Senado</span>'+seatBarHTML(r.senateSeats,208)+'</div>'+
+            '<div class="adminpredmeta">Participación '+r.participation+'% · Presidente/a: '+labelFor('president',r.president)+'</div>'+
+          '</div>';
         }
         return line;
       }).join('');
