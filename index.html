@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quiniela Electoral — Porra de Piter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<style>
+  :root{
+    --bg:#E7E9EC; --surface:#FFFFFF; --surface-raised:#F3F4F1;
+    --text:#141726; --text-muted:#5B6070; --border:#D7DAE0;
+    --accent:#9C6B16; --accent-strong:#B9821F; --accent-ink:#FFFFFF;
+    --good:#2E7D4F; --bad:#B23B3B;
+    --shadow: 0 1px 2px rgba(20,23,38,.06), 0 8px 24px -8px rgba(20,23,38,.08);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#10131C; --surface:#171B27; --surface-raised:#1E2333;
+      --text:#ECE9DE; --text-muted:#9BA0B4; --border:#2B3146;
+      --accent:#E0A93D; --accent-strong:#F0C169; --accent-ink:#10131C;
+      --good:#6FCB91; --bad:#E57373;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px -10px rgba(0,0,0,.55);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#10131C; --surface:#171B27; --surface-raised:#1E2333;
+    --text:#ECE9DE; --text-muted:#9BA0B4; --border:#2B3146;
+    --accent:#E0A93D; --accent-strong:#F0C169; --accent-ink:#10131C;
+    --good:#6FCB91; --bad:#E57373;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px -10px rgba(0,0,0,.55);
+  }
+
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg); color:var(--text); font-family:'IBM Plex Sans', system-ui, sans-serif; padding:0 16px; }
+  h1,h2,h3{ font-family:'Fraunces', Georgia, serif; text-wrap:balance; margin:0; }
+  .mono{ font-family:'IBM Plex Mono', 'Courier New', monospace; font-variant-numeric: tabular-nums; }
+  a{ color:var(--accent); }
+  button{ font-family:inherit; }
+  :focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+
+  .wrap{ max-width:900px; margin:0 auto; }
+
+  .configwarn{ display:none; background:#B23B3B; color:#fff; padding:12px 16px; border-radius:0 0 10px 10px; font-size:13px; margin-bottom:10px; }
+
+  header.top{ position:sticky; top:0; z-index:10; background:var(--bg); padding-top:18px; }
+  .brandrow{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; padding-bottom:14px; }
+  .brand{ font-family:'Fraunces', Georgia, serif; font-size:22px; font-weight:600; letter-spacing:.2px; }
+  .brand small{ display:block; font-family:'IBM Plex Mono', monospace; font-size:11px; font-weight:400; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); margin-top:2px; }
+  .headerstat{ font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--text-muted); text-align:right; }
+  .headerstat b{ color:var(--text); font-size:15px; }
+  nav.tabs{ display:flex; gap:4px; border-bottom:1px solid var(--border); overflow-x:auto; }
+  nav.tabs button{ background:none; border:none; cursor:pointer; padding:10px 14px 12px; font-size:14px; font-weight:500; color:var(--text-muted); border-bottom:2px solid transparent; margin-bottom:-1px; white-space:nowrap; }
+  nav.tabs button.active{ color:var(--text); border-bottom-color:var(--accent); }
+  nav.tabs button:hover{ color:var(--text); }
+
+  main{ padding:28px 0 40px; }
+  section.panel{ display:none; }
+  section.panel.active{ display:block; animation:fadein .25s ease; }
+  @keyframes fadein{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;} }
+
+  .hero{ padding:4px 0 22px; }
+  .hero h1{ font-size:clamp(24px,4vw,34px); line-height:1.15; }
+  .hero p{ color:var(--text-muted); font-size:15px; max-width:60ch; margin:10px 0 0; line-height:1.5; }
+  .legend{ display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
+  .legend span{ display:inline-flex; align-items:center; gap:6px; font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--text-muted); }
+  .dot{ width:8px; height:8px; border-radius:50%; display:inline-block; flex:none; }
+
+  .card{ background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow); padding:24px; }
+  .card + .card{ margin-top:20px; }
+  .card h2{ font-size:19px; margin-bottom:4px; }
+  .card .sub{ color:var(--text-muted); font-size:13.5px; margin:0 0 18px; }
+
+  .notice{ border:1px solid var(--border); border-left:3px solid var(--accent); background:var(--surface-raised); border-radius:0 10px 10px 0; padding:12px 16px; font-size:13.5px; color:var(--text-muted); margin-bottom:18px; }
+  .notice.ok{ border-left-color:var(--good); }
+  .notice strong{ color:var(--text); }
+
+  .field{ margin-bottom:16px; }
+  .field label{ display:block; font-size:12.5px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); margin-bottom:6px; }
+  .field input, .field select{ width:100%; padding:10px 12px; font-size:14.5px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:8px; font-family:inherit; }
+  .field input:focus, .field select:focus{ border-color:var(--accent); }
+  .field .hint{ font-size:12px; color:var(--text-muted); margin-top:5px; }
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:4px 16px; }
+  .grid3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px 20px; }
+  @media (max-width:560px){ .grid2, .grid3{ grid-template-columns:1fr; } }
+
+  .btn{ display:inline-flex; align-items:center; gap:8px; background:var(--accent); color:var(--accent-ink); border:none; border-radius:8px; padding:11px 20px; font-size:14.5px; font-weight:600; cursor:pointer; }
+  .btn:hover{ background:var(--accent-strong); }
+  .btn:disabled{ opacity:.5; cursor:not-allowed; }
+  .btn.ghost{ background:none; color:var(--bad); border:1px solid var(--border); padding:6px 12px; font-size:12.5px; }
+  .btn.ghost:hover{ background:var(--surface-raised); color:var(--bad); }
+  .btn.small{ padding:7px 14px; font-size:13px; }
+
+  .formmsg{ font-size:13.5px; margin-top:12px; }
+  .formmsg.err{ color:var(--bad); }
+  .formmsg.ok{ color:var(--good); }
+
+  /* chamber flip-card + hemicycle */
+  .flipouter{ perspective:1800px; }
+  .flipinner{ position:relative; width:100%; transition:transform .7s cubic-bezier(.4,.1,.2,1); transform-style:preserve-3d; }
+  .flipinner.flipped{ transform:rotateY(180deg); }
+  .flipface{ width:100%; backface-visibility:hidden; -webkit-backface-visibility:hidden; }
+  .flipface.back{ position:absolute; top:0; left:0; transform:rotateY(180deg); }
+  @media (prefers-reduced-motion: reduce){ .flipinner{ transition:none; } }
+  .chswitch{ display:flex; width:100%; background:var(--surface-raised); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin:4px 0 16px; }
+  .chswitch-btn{ flex:1 1 50%; background:none; border:none; padding:12px 8px; font-size:14px; font-weight:600; color:var(--text-muted); cursor:pointer; }
+  .chswitch-btn.active{ background:var(--accent); color:var(--accent-ink); }
+  .roundbadge{ padding:10px 12px; font-size:14.5px; font-weight:600; background:var(--surface-raised); border:1px solid var(--border); border-radius:8px; color:var(--text-muted); }
+  .checklist{ display:flex; flex-wrap:wrap; gap:7px; }
+  .checkitem{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; font-weight:600; padding:5px 10px; border-radius:6px; background:var(--surface-raised); border:1px solid var(--border); color:var(--text-muted); }
+  .checkitem.ok{ color:var(--good); border-color:var(--good); }
+  .checkitem.bad{ color:var(--bad); border-color:var(--bad); }
+  .chamber-head{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px; }
+  .chamber-head h3{ font-size:16px; }
+  .seattotal{ font-size:13.5px; font-weight:600; color:var(--text-muted); }
+  .hemicycle-wrap{ background:var(--surface-raised); border:1px solid var(--border); border-radius:12px; padding:8px 4px 2px; margin-bottom:6px; }
+  svg.hemicycle{ width:100%; height:auto; display:block; }
+  .seatempty{ fill:var(--surface); stroke:var(--border); stroke-width:1; }
+  .majoritycap{ text-align:center; font-size:11.5px; color:var(--text-muted); margin:2px 0 16px; font-family:'IBM Plex Mono',monospace; }
+  .seatlist{ display:flex; flex-direction:column; gap:7px; margin-top:4px; }
+  .seatrow{ display:grid; grid-template-columns:10px 1fr 86px; align-items:center; gap:10px; }
+  .seatrow .pname{ font-size:13.5px; }
+  .seatrow input{ padding:7px 9px; font-size:13.5px; text-align:right; }
+  .resthint{ font-size:11.5px; color:var(--text-muted); margin:10px 0 0; line-height:1.4; }
+
+  /* participants */
+  .plist{ display:flex; flex-direction:column; gap:0; }
+  .prow{ padding:11px 2px; border-bottom:1px solid var(--border); font-size:14px; }
+  .prow:last-child{ border-bottom:none; }
+  .prow .prowtop{ display:flex; align-items:center; justify-content:space-between; }
+  .prow .when{ color:var(--text-muted); font-size:12px; font-family:'IBM Plex Mono',monospace; }
+  .prow details{ margin-top:6px; }
+  .prow summary{ font-size:12px; color:var(--text-muted); cursor:pointer; }
+  .roundhist{ margin-top:8px; display:flex; flex-direction:column; gap:4px; }
+  .roundhist div{ font-size:12px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace; }
+  .empty{ text-align:center; padding:30px 10px; color:var(--text-muted); }
+  .empty .big{ font-family:'Fraunces', serif; font-size:32px; color:var(--text); margin-bottom:6px; }
+
+  /* leaderboard */
+  .lbrow{ display:grid; grid-template-columns:36px 1fr auto; align-items:center; gap:14px; padding:13px 4px; border-bottom:1px solid var(--border); }
+  .lbrow:last-child{ border-bottom:none; }
+  .lbrow .rank{ font-family:'IBM Plex Mono', monospace; font-weight:600; font-size:14px; color:var(--text-muted); text-align:center; }
+  .lbrow.winner .rank{ color:var(--accent); font-size:16px; }
+  .lbrow .nm{ font-weight:600; font-size:14.5px; }
+  .lbrow.winner .nm{ color:var(--accent); }
+  .lbrow .nm .tag{ display:block; font-weight:400; font-size:11.5px; color:var(--text-muted); font-family:'IBM Plex Mono', monospace; margin-top:2px; }
+  .lbrow .score{ font-family:'IBM Plex Mono', monospace; font-weight:600; font-size:17px; text-align:right; }
+  .lbrow .score small{ font-size:11px; color:var(--text-muted); font-weight:400; }
+  details.breakdown{ grid-column:1 / -1; margin-top:8px; }
+  details.breakdown summary{ font-size:12px; color:var(--text-muted); cursor:pointer; }
+  .bditems{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .chip{ font-family:'IBM Plex Mono', monospace; font-size:11px; background:var(--surface-raised); border:1px solid var(--border); border-radius:6px; padding:4px 8px; color:var(--text-muted); }
+  .chip b{ color:var(--text); }
+
+  .winnerband{ background:var(--surface-raised); border:1px solid var(--border); border-radius:12px; padding:22px; text-align:center; margin-bottom:22px; }
+  .winnerband .label{ font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--text-muted); }
+  .winnerband .name{ font-family:'Fraunces', serif; font-size:30px; font-weight:600; margin:6px 0 2px; color:var(--accent); }
+  .winnerband .score{ font-family:'IBM Plex Mono', monospace; color:var(--text-muted); font-size:13px; }
+
+  .kvgrid{ display:grid; grid-template-columns:1fr 1fr; gap:10px 20px; margin:6px 0 4px; }
+  @media (max-width:560px){ .kvgrid{ grid-template-columns:1fr; } }
+  .rkv{ padding:10px 0; border-bottom:1px solid var(--border); }
+  .rkv .k{ font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); }
+  .rkv .v{ font-size:15px; font-weight:600; margin-top:2px; }
+  .hemirow{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  @media (max-width:640px){ .hemirow{ grid-template-columns:1fr; } }
+  .hemilegend{ display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:16px; }
+
+  /* polls */
+  .pollcard{ border:1px solid var(--border); border-radius:12px; padding:16px 18px; margin-bottom:12px; background:var(--surface-raised); }
+  .pollcard:last-child{ margin-bottom:0; }
+  .pollhead{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+  .pollhead .who{ font-weight:600; font-size:14px; }
+  .pollhead .when{ font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text-muted); }
+  .pollstack{ display:flex; width:100%; height:30px; border-radius:7px; overflow:hidden; background:var(--border); }
+  .pollstack .seg{ flex:0 0 auto; height:100%; display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:700; overflow:hidden; white-space:nowrap; }
+  .pollsrc{ margin-top:10px; font-size:11px; }
+  .pollsrc a{ color:var(--text-muted); }
+
+  footer{ text-align:center; color:var(--text-muted); font-size:12px; padding-bottom:40px; }
+  .adminbadge{ display:inline-flex; align-items:center; gap:6px; font-family:'IBM Plex Mono', monospace; font-size:11px; background:var(--accent); color:var(--accent-ink); border-radius:6px; padding:3px 8px; margin-left:8px; vertical-align:middle; }
+
+  .adminlogin{ margin-top:18px; }
+  .adminlogin .adminform{ max-width:360px; margin:10px auto 0; text-align:left; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="configwarn" id="config-warn">⚠️ Falta configurar Firebase: edita el objeto <code>firebaseConfig</code> al final del archivo HTML (busca "PEGA_AQUI") y vuelve a subir el archivo.</div>
+  <header class="top">
+    <div class="brandrow">
+      <div class="brand">Quiniela Electoral<small>Predicciones · Elecciones Generales de España</small></div>
+      <div class="headerstat" id="headerstat">cargando…</div>
+    </div>
+    <nav class="tabs">
+      <button data-tab="predict" class="active">Tu predicción</button>
+      <button data-tab="participants">Participantes</button>
+      <button data-tab="results">Resultados y ranking</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- PREDICT -->
+    <section class="panel active" id="panel-predict">
+      <div class="hero">
+        <h1>¡Bienvenido/a a la porra de Piter! 🗳️</h1>
+        <p>Esta es la web de predicciones de Piter para las próximas elecciones. Antes de rellenar nada, un par de cosas:</p>
+        <p>La idea es pasarlo bien. Esta porra nace para ser algo ligero y divertido, no para generar confrontación, sino para abrir debate y comparar quién acierta más (y quién se columpia). Gana quien más se acerque, no quien más grite. 😄</p>
+        <p>Sobre el nombre: no hace falta que pongas tu nombre real. Puedes usar cualquier cosa con la que te identifiques o que te apetezca: un alias, un mote, el nombre de tu peña... Eso sí, lo que escribas ahí será público, así que elígelo con cabeza.</p>
+        <p>¡Mucha suerte con tus predicciones!</p>
+      </div>
+
+      <div class="card" id="polls-card">
+        <h2>Encuestas recientes</h2>
+        <p class="sub">Estimación de voto (%) de cada encuesta, para que te guíes al predecir. Pasa el cursor sobre la barra para ver cada partido y su porcentaje.</p>
+        <div class="legend" id="polls-legend"></div>
+        <div id="polls-admin"></div>
+        <div id="polls-list"></div>
+      </div>
+
+      <div class="card">
+        <h2>Tus respuestas</h2>
+        <p class="sub">Cada envío crea una nueva ronda en tu historial.</p>
+        <div id="predict-notice"></div>
+
+        <form id="predict-form">
+          <div class="grid2">
+            <div class="field">
+              <label for="pred_name">Tu nombre</label>
+              <input type="text" id="pred_name" maxlength="40" placeholder="Como quieres aparecer en el ranking" required>
+            </div>
+            <div class="field">
+              <label>Ronda actual</label>
+              <div class="roundbadge" id="pred_round_display">Recién convocadas</div>
+            </div>
+          </div>
+
+          <div class="chswitch" data-prefix="pred">
+            <button type="button" class="chswitch-btn active" data-ch="congress">Congreso</button>
+            <button type="button" class="chswitch-btn" data-ch="senate">Senado</button>
+          </div>
+          <div id="pred-chambers"></div>
+
+          <div class="grid2" style="margin-top:6px;">
+            <div class="field">
+              <label for="pred_participation">Participación electoral (%)</label>
+              <input type="number" id="pred_participation" min="0" max="100" step="0.1" placeholder="0–100" required>
+            </div>
+            <div class="field">
+              <label for="pred_president">Quién será presidente/a del Gobierno</label>
+              <select id="pred_president" required></select>
+            </div>
+          </div>
+
+          <div class="checklist" id="pred-checklist"></div>
+
+          <button type="submit" class="btn" id="predict-submit">Guardar esta ronda</button>
+          <div class="formmsg" id="predict-msg"></div>
+        </form>
+      </div>
+
+      <div class="card">
+        <details>
+          <summary style="cursor:pointer; font-size:13.5px; color:var(--text-muted);">¿Cómo se puntúa cada predicción?</summary>
+          <div class="bditems" style="margin-top:14px;">
+            <span class="chip">Congreso: 100 − diferencia total de escaños frente al resultado real (mín. 0)</span>
+            <span class="chip">Senado: 60 − diferencia total de escaños frente al resultado real (mín. 0)</span>
+            <span class="chip">Participación: 20 − 2× diferencia en p.p. (mín. 0)</span>
+            <span class="chip">Presidente/a: <b>+20</b> si aciertas</span>
+          </div>
+          <p class="sub" style="margin-top:12px; margin-bottom:0;">Máximo posible: 200 puntos. Solo cuenta la última ronda que guardes antes de que se publiquen los resultados oficiales.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- PARTICIPANTS -->
+    <section class="panel" id="panel-participants">
+      <div class="hero">
+        <h1>Quién ha entrado en la quiniela.</h1>
+        <p>Las respuestas de cada persona se mantienen fuera de esta lista hasta que se publiquen los resultados oficiales — aquí solo verás quién ha participado y cuántas rondas ha guardado.</p>
+      </div>
+      <div class="card">
+        <h2>Participantes</h2>
+        <p class="sub" id="participants-sub"></p>
+        <div class="plist" id="participants-list"></div>
+      </div>
+    </section>
+
+    <!-- RESULTS -->
+    <section class="panel" id="panel-results">
+      <div class="hero">
+        <h1>Resultados oficiales y ranking.</h1>
+        <p>En cuanto entren los resultados reales, esta pestaña calcula automáticamente la puntuación de la última ronda de cada participante y corona a quien más se haya acercado.</p>
+      </div>
+
+      <div id="admin-panel"></div>
+      <div id="results-content"></div>
+    </section>
+  </main>
+
+  <footer>
+    Quiniela entre amigos — no es una encuesta oficial ni tiene afiliación con ningún partido.
+    <div class="adminlogin" id="adminlogin">
+      <button type="button" class="btn ghost small" id="admin-login-toggle">Acceso administrador</button>
+      <div class="adminform" id="admin-login-form" style="display:none;">
+        <div class="grid2">
+          <div class="field"><label for="admin-email">Email</label><input type="email" id="admin-email"></div>
+          <div class="field"><label for="admin-password">Contraseña</label><input type="password" id="admin-password"></div>
+        </div>
+        <button type="button" class="btn small" id="admin-login-submit">Entrar</button>
+        <div class="formmsg" id="admin-login-msg"></div>
+      </div>
+      <div id="admin-signed-in" style="display:none;">
+        <span class="sub">Sesión de administrador activa.</span>
+        <button type="button" class="btn ghost small" id="admin-logout">Cerrar sesión</button>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<script>
+(function(){
+  const PARTIES = ["PSOE","PP","Sumar","Vox","PNV","ERC","EH Bildu","Junts","CC","Resto"];
+  const PARTY_ORDER = PARTIES;
+  const HEMI_ORDER = ["EH Bildu","ERC","Sumar","PSOE","PNV","Junts","CC","Resto","PP","Vox"];
+  const PARTY_COLOR = {
+    "EH Bildu":"#A33B6B", "ERC":"#F2C230", "Sumar":"#E6007E", "PSOE":"#E30613",
+    "PNV":"#007A33", "Junts":"#004D98", "CC":"#D9B300", "Resto":"#8A8D98",
+    "PP":"#1B6FB2", "Vox":"#4C9F38"
+  };
+  const PRESIDENT_OPTS = [
+    ["Sanchez","Pedro Sánchez"],["Feijoo","Alberto Núñez Feijóo"],
+    ["Abascal","Santiago Abascal"],["Diaz","Yolanda Díaz"],["Otro","Otra persona"]
+  ];
+  const CHAMBERS = {
+    congress: { total:350, rows:12, label:"Congreso de los Diputados", majority:176 },
+    senate:   { total:208, rows:9,  label:"Senado (escaños de elección directa)", majority:105 }
+  };
+  const RESTO_HINT = "Resto incluye BNG, CUP, Compromís, Podemos (en candidatura propia), UPN, Teruel Existe y otras candidaturas menores.";
+  const PARTY_TEXT = { "ERC":"#1a1a1a", "CC":"#1a1a1a" };
+  function textColorFor(p){ return PARTY_TEXT[p] || '#ffffff'; }
+
+  function pid(p){ return p.replace(/[^A-Za-z0-9]/g,''); }
+  function fillSelect(sel, opts, placeholder){
+    sel.innerHTML = '<option value="" disabled selected>'+placeholder+'</option>' +
+      opts.map(function(o){ return '<option value="'+o[0]+'">'+o[1]+'</option>'; }).join('');
+  }
+  fillSelect(document.getElementById('pred_president'), PRESIDENT_OPTS, 'Elige una opción');
+
+  function chamberBlockHTML(prefix, chamberId){
+    const c = CHAMBERS[chamberId];
+    const rows = PARTY_ORDER.map(function(p){
+      return '<div class="seatrow"><span class="dot" style="background:'+PARTY_COLOR[p]+'"></span>'+
+        '<span class="pname">'+p+'</span>'+
+        '<input type="number" min="0" max="'+c.total+'" step="1" value="0" '+
+        'id="'+prefix+'_'+chamberId+'_'+pid(p)+'" data-chamber="'+chamberId+'" data-prefix="'+prefix+'" class="seatinput"></div>';
+    }).join('');
+    return '<div class="chamberblock" id="'+prefix+'_'+chamberId+'_block">'+
+      '<div class="chamber-head"><h3>'+c.label+'</h3><div class="seattotal mono" id="'+prefix+'_'+chamberId+'_total">0 / '+c.total+'</div></div>'+
+      '<div class="hemicycle-wrap"><svg class="hemicycle" id="'+prefix+'_'+chamberId+'_svg" viewBox="0 0 400 215"></svg></div>'+
+      '<div class="majoritycap">Mayoría absoluta: '+c.majority+' de '+c.total+'</div>'+
+      '<div class="seatlist">'+rows+'</div>'+
+      '<p class="resthint">'+RESTO_HINT+'</p>'+
+    '</div>';
+  }
+  function buildFlipChambers(prefix){
+    return '<div class="flipouter"><div class="flipinner" id="'+prefix+'_flipinner">'+
+      '<div class="flipface front">'+ chamberBlockHTML(prefix,'congress') +'</div>'+
+      '<div class="flipface back">'+ chamberBlockHTML(prefix,'senate') +'</div>'+
+    '</div></div>';
+  }
+  function setChamber(prefix, ch){
+    const inner = document.getElementById(prefix+'_flipinner');
+    if (inner) inner.classList.toggle('flipped', ch === 'senate');
+    document.querySelectorAll('.chswitch[data-prefix="'+prefix+'"] .chswitch-btn').forEach(function(b){
+      b.classList.toggle('active', b.dataset.ch === ch);
+    });
+  }
+  document.getElementById('pred-chambers').innerHTML = buildFlipChambers('pred');
+
+  const autoFlipped = { pred:false, res:false };
+  document.addEventListener('click', function(e){
+    const btn = e.target.closest('.chswitch-btn');
+    if (!btn) return;
+    const group = btn.closest('.chswitch');
+    setChamber(group.dataset.prefix, btn.dataset.ch);
+  });
+
+  // seat allocation -> hemicycle
+  const slotCache = {};
+  function getSlots(total, rows){
+    const key = total+'_'+rows;
+    if (slotCache[key]) return slotCache[key];
+    const rMin=55, rMax=185;
+    const rowRadii = [];
+    for (let r=0;r<rows;r++) rowRadii.push(rMin + (rMax-rMin)*r/Math.max(1,rows-1));
+    const totalWeight = rowRadii.reduce(function(a,b){return a+b;},0);
+    let counts = rowRadii.map(function(w){ return Math.max(1, Math.round(total*w/totalWeight)); });
+    let diff = total - counts.reduce(function(a,b){return a+b;},0);
+    const order = rowRadii.map(function(_,i){return i;}).sort(function(a,b){return rowRadii[b]-rowRadii[a];});
+    let guard=0;
+    while (diff !== 0 && guard < 5000){
+      const i = order[guard % order.length];
+      if (diff > 0){ counts[i]++; diff--; }
+      else if (counts[i] > 1){ counts[i]--; diff++; }
+      guard++;
+    }
+    const angleStart=168, angleEnd=12;
+    let slots = [];
+    for (let r=0;r<rows;r++){
+      const n = counts[r], radius = rowRadii[r];
+      for (let i=0;i<n;i++){
+        const t = n===1 ? 0.5 : i/(n-1);
+        const deg = angleStart + (angleEnd-angleStart)*t;
+        const rad = deg*Math.PI/180;
+        slots.push({ x: 200 + radius*Math.cos(rad), y: 200 - radius*Math.sin(rad), deg: deg });
+      }
+    }
+    slots.sort(function(a,b){ return b.deg - a.deg; });
+    slotCache[key] = slots;
+    return slots;
+  }
+  function renderHemicycle(svg, counts, total, rows){
+    if (!svg) return;
+    const slots = getSlots(total, rows);
+    const seq = [];
+    HEMI_ORDER.forEach(function(p){
+      const n = Math.max(0, Math.min(counts[p]||0, total - seq.length));
+      for (let i=0;i<n;i++) seq.push(p);
+    });
+    const seatR = total > 300 ? 3.4 : 4.4;
+    let out = '';
+    slots.forEach(function(slot, i){
+      const party = seq[i];
+      if (party){
+        out += '<circle cx="'+slot.x.toFixed(1)+'" cy="'+slot.y.toFixed(1)+'" r="'+seatR+'" fill="'+PARTY_COLOR[party]+'"/>';
+      } else {
+        out += '<circle cx="'+slot.x.toFixed(1)+'" cy="'+slot.y.toFixed(1)+'" r="'+seatR+'" class="seatempty"/>';
+      }
+    });
+    svg.innerHTML = out;
+  }
+  function readCounts(prefix, chamberId){
+    const counts = {};
+    PARTY_ORDER.forEach(function(p){
+      const el = document.getElementById(prefix+'_'+chamberId+'_'+pid(p));
+      counts[p] = el ? (parseInt(el.value,10) || 0) : 0;
+    });
+    return counts;
+  }
+  function updateChamberUI(prefix, chamberId){
+    const c = CHAMBERS[chamberId];
+    const counts = readCounts(prefix, chamberId);
+    const sum = PARTY_ORDER.reduce(function(s,p){ return s + counts[p]; }, 0);
+    const totalEl = document.getElementById(prefix+'_'+chamberId+'_total');
+    if (totalEl){
+      totalEl.textContent = sum + ' / ' + c.total;
+      totalEl.style.color = sum === c.total ? 'var(--good)' : (sum > c.total ? 'var(--bad)' : '');
+    }
+    renderHemicycle(document.getElementById(prefix+'_'+chamberId+'_svg'), counts, c.total, c.rows);
+    if (chamberId === 'congress' && sum === c.total && !autoFlipped[prefix]){
+      autoFlipped[prefix] = true;
+      setTimeout(function(){ setChamber(prefix, 'senate'); }, 450);
+    }
+    return sum;
+  }
+  function fillCounts(prefix, chamberId, counts){
+    PARTY_ORDER.forEach(function(p){
+      const el = document.getElementById(prefix+'_'+chamberId+'_'+pid(p));
+      if (el) el.value = (counts && counts[p] != null) ? counts[p] : 0;
+    });
+    updateChamberUI(prefix, chamberId);
+  }
+  document.addEventListener('input', function(e){
+    if (!e.target.classList.contains('seatinput')) return;
+    updateChamberUI(e.target.dataset.prefix, e.target.dataset.chamber);
+    if (e.target.dataset.prefix === 'pred') renderPredictChecklist();
+  });
+  function renderPredictChecklist(){
+    const host = document.getElementById('pred-checklist');
+    if (!host) return;
+    const congressCounts = readCounts('pred','congress'), senateCounts = readCounts('pred','senate');
+    const congressSum = PARTY_ORDER.reduce(function(s,p){ return s + congressCounts[p]; }, 0);
+    const senateSum = PARTY_ORDER.reduce(function(s,p){ return s + senateCounts[p]; }, 0);
+    const participation = document.getElementById('pred_participation').value;
+    const president = document.getElementById('pred_president').value;
+    const items = [
+      { label:'Congreso '+congressSum+'/350', ok: congressSum===350 },
+      { label:'Senado '+senateSum+'/208', ok: senateSum===208 },
+      { label:'Participación', ok: participation!=='' && !isNaN(participation) && participation>=0 && participation<=100 },
+      { label:'Presidente/a', ok: !!president }
+    ];
+    host.innerHTML = items.map(function(it){
+      return '<span class="checkitem '+(it.ok?'ok':'bad')+'">'+(it.ok?'✓':'✗')+' '+it.label+'</span>';
+    }).join('');
+  }
+  document.getElementById('pred_participation').addEventListener('input', renderPredictChecklist);
+  document.getElementById('pred_president').addEventListener('change', renderPredictChecklist);
+  updateChamberUI('pred','congress'); updateChamberUI('pred','senate');
+  renderPredictChecklist();
+
+  function labelFor(field, value){
+    if (field === "president"){ const o = PRESIDENT_OPTS.find(function(x){return x[0]===value;}); return o?o[1]:value; }
+    return value;
+  }
+  function topParty(counts){
+    let best=null, bv=-1;
+    PARTY_ORDER.forEach(function(p){ const v=(counts&&counts[p])||0; if (v>bv){ bv=v; best=p; } });
+    return best;
+  }
+  function chamberAbsError(pred, actual){
+    let err=0; PARTY_ORDER.forEach(function(p){ err += Math.abs((pred&&pred[p]||0) - (actual&&actual[p]||0)); });
+    return err;
+  }
+  function scoreRound(round, actual){
+    const congressErr = chamberAbsError(round.congressSeats, actual.congressSeats);
+    const senateErr = chamberAbsError(round.senateSeats, actual.senateSeats);
+    const congressPts = Math.max(0, 100 - congressErr);
+    const senatePts = Math.max(0, 60 - senateErr);
+    const partDiff = Math.abs((round.participation||0) - (actual.participation||0));
+    const partPts = Math.max(0, Math.round(20 - partDiff*2));
+    const presPts = (round.president && round.president === actual.president) ? 20 : 0;
+    return {
+      total: congressPts+senatePts+partPts+presPts,
+      breakdown: { congress:congressPts, senate:senatePts, participation:partPts, president:presPts },
+      errors: { congress:congressErr, senate:senateErr }
+    };
+  }
+
+  const dtf = new Intl.DateTimeFormat('es-ES', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+  function fmtDate(iso){ try { return dtf.format(new Date(iso)); } catch(e){ return ''; } }
+  const dtfDay = new Intl.DateTimeFormat('es-ES', { day:'2-digit', month:'short', year:'numeric' });
+  function fmtDay(isoDate){ try { return dtfDay.format(new Date(isoDate+'T00:00:00')); } catch(e){ return isoDate; } }
+  function escapeHtml(s){
+    return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
+  }
+
+  document.querySelectorAll('nav.tabs button').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('nav.tabs button').forEach(function(b){ b.classList.remove('active'); });
+      document.querySelectorAll('section.panel').forEach(function(p){ p.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  let dbApi=null, authApi=null, myId=null, canEdit=false;
+  let predictions=[], results=null, polls=[];
+  let currentRoundName = "Recién convocadas";
+  function renderRoundBadge(){
+    const el = document.getElementById('pred_round_display');
+    if (el) el.textContent = currentRoundName;
+  }
+
+  function setHeaderStat(){
+    const el = document.getElementById('headerstat');
+    if (!dbApi){ el.textContent=''; return; }
+    const rounds = predictions.reduce(function(s,p){ return s+((p.rounds||[]).length); },0);
+    el.innerHTML = '<b>'+predictions.length+'</b> participante'+(predictions.length===1?'':'s')+
+      ' · '+rounds+' ronda'+(rounds===1?'':'s')+(results?' · resultados publicados':'');
+  }
+
+  function myLastRound(){
+    const mine = predictions.find(function(p){ return p.id===myId; });
+    if (!mine || !mine.rounds || !mine.rounds.length) return null;
+    return mine.rounds[mine.rounds.length-1];
+  }
+  function disableForm(disabled){
+    document.querySelectorAll('#predict-form input, #predict-form select, #predict-submit').forEach(function(el){ el.disabled = disabled; });
+  }
+  function renderPredictNotice(){
+    const box = document.getElementById('predict-notice');
+    box.innerHTML = '';
+    if (!dbApi){
+      box.innerHTML = '<div class="notice">No se puede conectar con la base de datos. Revisa la configuración de Firebase.</div>';
+      disableForm(true); return;
+    }
+    if (results){
+      box.innerHTML = '<div class="notice">Las predicciones están cerradas: ya se han publicado los resultados oficiales. Consulta la pestaña <strong>Resultados y ranking</strong>.</div>';
+      disableForm(true); return;
+    }
+    const last = myLastRound();
+    if (last){
+      box.innerHTML = '<div class="notice ok">Tu última ronda fue «<strong>'+escapeHtml(last.title)+'</strong>», guardada el '+fmtDate(last.submittedAt)+'. Puedes guardar una nueva ronda cuando quieras.</div>';
+    }
+    disableForm(false);
+  }
+
+  function renderParticipants(){
+    const list = document.getElementById('participants-list');
+    const sub = document.getElementById('participants-sub');
+    sub.textContent = predictions.length
+      ? predictions.length+' persona'+(predictions.length===1?'':'s')+' ya '+(predictions.length===1?'ha':'han')+' enviado al menos una predicción.'
+      : 'Todavía nadie ha enviado su predicción.';
+    if (!predictions.length){
+      list.innerHTML = '<div class="empty"><div class="big">—</div>Sé la primera persona en participar.</div>';
+      return;
+    }
+    const sorted = predictions.slice().sort(function(a,b){
+      const la = (a.rounds&&a.rounds.length) ? a.rounds[a.rounds.length-1].submittedAt : '';
+      const lb = (b.rounds&&b.rounds.length) ? b.rounds[b.rounds.length-1].submittedAt : '';
+      return la.localeCompare(lb);
+    });
+    list.innerHTML = sorted.map(function(p){
+      const rounds = p.rounds||[];
+      const last = rounds.length ? rounds[rounds.length-1] : null;
+      const hist = rounds.slice().reverse().map(function(r){
+        return '<div>'+fmtDate(r.submittedAt)+' — '+escapeHtml(r.title)+'</div>';
+      }).join('');
+      return '<div class="prow">'+
+        '<div class="prowtop"><span>'+escapeHtml(p.name||'(sin nombre)')+'</span>'+
+        '<span class="when">'+rounds.length+' ronda'+(rounds.length===1?'':'s')+(last?' · última '+fmtDate(last.submittedAt):'')+'</span></div>'+
+        (rounds.length ? '<details><summary>Ver historial de rondas</summary><div class="roundhist">'+hist+'</div></details>' : '') +
+      '</div>';
+    }).join('');
+  }
+
+  function renderOfficialHemicycles(host){
+    let html = '<div class="hemirow">';
+    ['congress','senate'].forEach(function(ch){
+      const c = CHAMBERS[ch];
+      const counts = results[ch==='congress'?'congressSeats':'senateSeats'] || {};
+      const sorted = PARTY_ORDER.slice().sort(function(a,b){ return (counts[b]||0)-(counts[a]||0); });
+      html += '<div><div class="hemicycle-wrap"><svg class="hemicycle" id="official_'+ch+'_svg" viewBox="0 0 400 215"></svg></div>'+
+        '<div class="majoritycap">'+c.label+' · mayoría '+c.majority+'/'+c.total+'</div>'+
+        '<div class="hemilegend">'+sorted.filter(function(p){return (counts[p]||0)>0;}).map(function(p){
+          return '<span class="chip"><i class="dot" style="background:'+PARTY_COLOR[p]+';display:inline-block;margin-right:4px;"></i>'+p+' <b>'+(counts[p]||0)+'</b></span>';
+        }).join('')+'</div></div>';
+    });
+    html += '</div>';
+    host.innerHTML = html;
+    ['congress','senate'].forEach(function(ch){
+      const c = CHAMBERS[ch];
+      const counts = results[ch==='congress'?'congressSeats':'senateSeats'] || {};
+      renderHemicycle(document.getElementById('official_'+ch+'_svg'), counts, c.total, c.rows);
+    });
+  }
+
+  function renderResults(){
+    const host = document.getElementById('results-content');
+    if (!results){
+      host.innerHTML = '<div class="card"><div class="empty">'+
+        '<div class="big">⏳</div>'+
+        'Aún no se han introducido los resultados oficiales.<br>'+
+        'Cuando se cierren las urnas y se publiquen, aquí aparecerán los hemiciclos finales y el ranking de quién más se ha acercado.'+
+      '</div></div>';
+      return;
+    }
+    const scored = predictions.map(function(p){
+      const rounds = p.rounds||[];
+      if (!rounds.length) return null;
+      const last = rounds[rounds.length-1];
+      const s = scoreRound(last, results);
+      return { id:p.id, name:p.name||'(sin nombre)', round:last, total:s.total, breakdown:s.breakdown };
+    }).filter(Boolean).sort(function(a,b){
+      if (b.total !== a.total) return b.total - a.total;
+      return a.round.submittedAt.localeCompare(b.round.submittedAt);
+    });
+
+    let html = '<div class="card"><h2>Resultados oficiales</h2><p class="sub">Introducidos el '+fmtDate(results.finalizedAt)+'.</p><div id="official-hemis"></div>';
+    html += '<div class="kvgrid">'+
+      '<div class="rkv"><div class="k">Participación</div><div class="v">'+results.participation+' %</div></div>'+
+      '<div class="rkv"><div class="k">Presidente/a</div><div class="v">'+labelFor('president',results.president)+'</div></div>'+
+    '</div></div>';
+
+    if (scored.length){
+      const w = scored[0];
+      html += '<div class="winnerband"><div class="label">Ganador o ganadora</div><div class="name">'+escapeHtml(w.name)+'</div><div class="score">'+w.total+' / 200 puntos</div></div>';
+    }
+
+    html += '<div class="card"><h2>Ranking</h2><p class="sub">'+scored.length+' predicción'+(scored.length===1?'':'es')+' puntuada'+(scored.length===1?'':'s')+' (última ronda de cada participante).</p>';
+    if (!scored.length){
+      html += '<div class="empty">Nadie ha enviado todavía una predicción.</div>';
+    } else {
+      scored.forEach(function(row, i){
+        const congWinner = topParty(row.round.congressSeats), congReal = topParty(results.congressSeats);
+        html += '<div class="lbrow'+(i===0?' winner':'')+'">';
+        html += '<div class="rank mono">'+(i+1)+'</div>';
+        html += '<div class="nm">'+escapeHtml(row.name)+'<span class="tag">«'+escapeHtml(row.round.title)+'» · '+fmtDate(row.round.submittedAt)+'</span></div>';
+        html += '<div class="score">'+row.total+'<small> / 200</small></div>';
+        html += '<details class="breakdown"><summary>Ver desglose</summary><div class="bditems">'+
+          '<span class="chip">Congreso: <b>+'+row.breakdown.congress+'</b></span>'+
+          '<span class="chip">Senado: <b>+'+row.breakdown.senate+'</b></span>'+
+          '<span class="chip">Participación: <b>+'+row.breakdown.participation+'</b> ('+row.round.participation+'% vs '+results.participation+'%)</span>'+
+          '<span class="chip">Presidente/a: <b>+'+row.breakdown.president+'</b></span>'+
+          '<span class="chip">Ganador Congreso predicho: <b>'+congWinner+'</b> (real: '+congReal+') '+(congWinner===congReal?'✓':'✗')+'</span>'+
+        '</div></details>';
+        html += '</div>';
+      });
+    }
+    html += '</div>';
+    host.innerHTML = html;
+    renderOfficialHemicycles(document.getElementById('official-hemis'));
+  }
+
+  let adminBuilt = false;
+  function refreshAdminFromResults(){
+    if (!adminBuilt) return;
+    if (results){
+      fillCounts('res','congress', results.congressSeats);
+      fillCounts('res','senate', results.senateSeats);
+      document.getElementById('res_participation').value = results.participation;
+      document.getElementById('res_president').value = results.president;
+    } else {
+      updateChamberUI('res','congress'); updateChamberUI('res','senate');
+    }
+    const clearBtn = document.getElementById('admin-clear');
+    if (clearBtn) clearBtn.style.display = results ? '' : 'none';
+  }
+  function buildAdminPanelOnce(){
+    if (adminBuilt || !canEdit) return;
+    adminBuilt = true;
+    const host = document.getElementById('admin-panel');
+    host.innerHTML =
+      '<div class="card"><h2>Panel de administración<span class="adminbadge">solo tú ves esto</span></h2>'+
+      '<p class="sub">Introduce aquí los resultados reales en cuanto se conozcan. En cuanto los guardes, se cerrarán las predicciones y se calculará el ranking para todo el mundo.</p>'+
+      '<form id="admin-form">'+
+        '<div class="chswitch" data-prefix="res">'+
+          '<button type="button" class="chswitch-btn active" data-ch="congress">Congreso</button>'+
+          '<button type="button" class="chswitch-btn" data-ch="senate">Senado</button>'+
+        '</div>'+
+        '<div id="res-chambers"></div>'+
+        '<div class="grid2" style="margin-top:6px;">'+
+          '<div class="field"><label for="res_participation">Participación electoral (%)</label><input type="number" id="res_participation" min="0" max="100" step="0.1" required></div>'+
+          '<div class="field"><label for="res_president">Quién es presidente/a del Gobierno</label><select id="res_president" required></select></div>'+
+        '</div>'+
+        '<button type="submit" class="btn" id="admin-submit">Guardar resultados oficiales</button>'+
+        ' <button type="button" class="btn ghost" id="admin-clear" style="display:none;">Borrar resultados y reabrir predicciones</button>'+
+        '<div class="formmsg" id="admin-msg"></div>'+
+      '</form></div>';
+
+    document.getElementById('res-chambers').innerHTML = buildFlipChambers('res');
+    fillSelect(document.getElementById('res_president'), PRESIDENT_OPTS, 'Elige una opción');
+    updateChamberUI('res','congress'); updateChamberUI('res','senate');
+    refreshAdminFromResults();
+
+    document.getElementById('admin-form').addEventListener('submit', async function(e){
+      e.preventDefault();
+      const msg = document.getElementById('admin-msg');
+      const congressSeats = readCounts('res','congress'), senateSeats = readCounts('res','senate');
+      const congressSum = PARTY_ORDER.reduce(function(s,p){return s+congressSeats[p];},0);
+      const senateSum = PARTY_ORDER.reduce(function(s,p){return s+senateSeats[p];},0);
+      const participation = parseFloat(document.getElementById('res_participation').value);
+      const president = document.getElementById('res_president').value;
+      const problems = [];
+      if (congressSum !== 350) problems.push('Congreso: '+congressSum+'/350 escaños asignados');
+      if (senateSum !== 208) problems.push('Senado: '+senateSum+'/208 escaños asignados');
+      if (isNaN(participation) || participation<0 || participation>100) problems.push('participación inválida');
+      if (!president) problems.push('falta presidente/a');
+      if (problems.length){ msg.className='formmsg err'; msg.textContent='Revisa: '+problems.join(' · '); return; }
+      const btn = document.getElementById('admin-submit');
+      btn.disabled = true; msg.className='formmsg'; msg.textContent='Guardando…';
+      try{
+        await dbApi.doc('results/actual').set({ congressSeats, senateSeats, participation, president, finalizedAt:new Date().toISOString() });
+        msg.className='formmsg ok'; msg.textContent='Resultados guardados. El ranking ya está visible para todo el mundo.';
+      }catch(err){
+        msg.className='formmsg err'; msg.textContent='No se pudieron guardar los resultados ('+(err&&err.code||'error')+').';
+      }
+      btn.disabled = false;
+    });
+    document.getElementById('admin-clear').addEventListener('click', async function(){
+      if (!confirm('¿Borrar los resultados oficiales y reabrir las predicciones?')) return;
+      const msg = document.getElementById('admin-msg');
+      try{
+        await dbApi.doc('results/actual').delete();
+        msg.className='formmsg ok'; msg.textContent='Resultados borrados. Las predicciones vuelven a estar abiertas.';
+      }catch(err){
+        msg.className='formmsg err'; msg.textContent='No se pudo borrar ('+(err&&err.code||'error')+').';
+      }
+    });
+  }
+
+  function renderPolls(){
+    const listHost = document.getElementById('polls-list');
+    const adminHost = document.getElementById('polls-admin');
+    document.getElementById('polls-legend').innerHTML = PARTY_ORDER.map(function(p){
+      return '<span><i class="dot" style="background:'+PARTY_COLOR[p]+'"></i>'+p+'</span>';
+    }).join('');
+    const sorted = polls.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+    if (!sorted.length){
+      listHost.innerHTML = '<div class="empty" style="padding:16px;">Todavía no hay encuestas cargadas.</div>';
+    } else {
+      listHost.innerHTML = sorted.map(function(poll){
+        const segs = PARTY_ORDER.filter(function(p){ return poll.share && poll.share[p]!=null; }).map(function(p){
+          const v = poll.share[p];
+          const label = v >= 5 ? v+'%' : '';
+          return '<span class="seg" style="width:'+v+'%; background:'+PARTY_COLOR[p]+'; color:'+textColorFor(p)+'" title="'+p+': '+v+'%">'+label+'</span>';
+        }).join('');
+        const del = canEdit ? ' <button type="button" class="btn ghost small" data-pollid="'+poll.id+'" onclick="return false;" data-delpoll="1">Borrar</button>' : '';
+        return '<div class="pollcard" data-pollid="'+poll.id+'">'+
+          '<div class="pollhead"><span class="who">'+escapeHtml(poll.pollster)+'</span><span class="when mono">'+fmtDay(poll.date)+'</span></div>'+
+          '<div class="pollstack">'+segs+'</div>' +
+          (poll.source ? '<div class="pollsrc"><a href="'+poll.source+'" target="_blank" rel="noopener">Fuente</a></div>' : '') +
+          (canEdit ? '<div style="margin-top:8px;">'+del+'</div>' : '') +
+        '</div>';
+      }).join('');
+      if (canEdit){
+        listHost.querySelectorAll('[data-delpoll]').forEach(function(btn){
+          btn.addEventListener('click', async function(){
+            const id = btn.closest('.pollcard').dataset.pollid;
+            if (!confirm('¿Borrar esta encuesta?')) return;
+            try{ await dbApi.collection('polls').doc(id).delete(); }catch(e){}
+          });
+        });
+      }
+    }
+    adminHost.innerHTML = canEdit
+      ? '<p class="sub" style="margin:0 0 16px;">Añade encuestas desde la consola de Firebase (colección <code class="mono">polls</code>) o pídeme el código para hacerlo.</p>'
+      : '';
+  }
+
+  function renderAll(){
+    setHeaderStat(); renderPredictNotice(); renderParticipants(); renderResults(); buildAdminPanelOnce(); renderPolls();
+  }
+
+  document.getElementById('predict-form').addEventListener('submit', async function(e){
+    e.preventDefault();
+    const msg = document.getElementById('predict-msg');
+    if (!dbApi){ msg.className='formmsg err'; msg.textContent='No se puede guardar: revisa la conexión.'; return; }
+    const name = document.getElementById('pred_name').value.trim();
+    const title = currentRoundName;
+    const congressSeats = readCounts('pred','congress'), senateSeats = readCounts('pred','senate');
+    const congressSum = PARTY_ORDER.reduce(function(s,p){return s+congressSeats[p];},0);
+    const senateSum = PARTY_ORDER.reduce(function(s,p){return s+senateSeats[p];},0);
+    const participation = parseFloat(document.getElementById('pred_participation').value);
+    const president = document.getElementById('pred_president').value;
+    const problems = [];
+    if (!name) problems.push('falta tu nombre');
+    if (congressSum !== 350) problems.push('Congreso: '+congressSum+'/350 escaños asignados');
+    if (senateSum !== 208) problems.push('Senado: '+senateSum+'/208 escaños asignados');
+    if (isNaN(participation) || participation<0 || participation>100) problems.push('participación inválida');
+    if (!president) problems.push('falta presidente/a');
+    if (problems.length){
+      msg.className='formmsg err'; msg.textContent='Revisa: '+problems.join(' · ');
+      if (congressSum !== 350) setChamber('pred','congress');
+      else if (senateSum !== 208) setChamber('pred','senate');
+      return;
+    }
+
+    const round = { title, congressSeats, senateSeats, participation, president, submittedAt:new Date().toISOString() };
+    const btn = document.getElementById('predict-submit');
+    btn.disabled = true; msg.className='formmsg'; msg.textContent='Guardando…';
+    try{
+      const ref = dbApi.doc('predictions/'+myId);
+      const snap = await ref.get();
+      const existing = snap.exists ? snap.data() : {};
+      const rounds = (existing.rounds || []).concat([round]);
+      await ref.set({ name, rounds });
+      msg.className='formmsg ok'; msg.textContent='¡Ronda guardada!';
+    }catch(err){
+      msg.className='formmsg err';
+      msg.textContent = (err && err.code === 'permission-denied')
+        ? 'No tienes permiso para escribir. Revisa las reglas de Firestore.'
+        : 'No se pudo guardar tu predicción.';
+    }
+    btn.disabled = false;
+  });
+
+  // ---- Acceso de administrador (Firebase Auth) ----
+  const ADMIN_EMAIL = 'pedroazkarre@gmail.com'; // cambia esto si el admin es otra persona
+  document.getElementById('admin-login-toggle').addEventListener('click', function(){
+    const f = document.getElementById('admin-login-form');
+    f.style.display = f.style.display === 'none' ? 'block' : 'none';
+  });
+  document.getElementById('admin-login-submit').addEventListener('click', async function(){
+    const msg = document.getElementById('admin-login-msg');
+    if (!authApi){ msg.className='formmsg err'; msg.textContent='Firebase no está configurado.'; return; }
+    const email = document.getElementById('admin-email').value.trim();
+    const password = document.getElementById('admin-password').value;
+    try{
+      await authApi.signInWithEmailAndPassword(email, password);
+      msg.className='formmsg ok'; msg.textContent='Sesión iniciada.';
+    }catch(err){
+      msg.className='formmsg err'; msg.textContent='No se pudo iniciar sesión: '+err.message;
+    }
+  });
+  document.getElementById('admin-logout').addEventListener('click', function(){
+    if (authApi) authApi.signOut();
+  });
+
+  // ---- Arranque ----
+  const firebaseConfig = {
+    apiKey: "AIzaSyBZlwngsNDIvdf5J4xB2V26xK-9eOAE9hc",
+    authDomain: "quiniela-electoral-piter.firebaseapp.com",
+    projectId: "quiniela-electoral-piter",
+    storageBucket: "quiniela-electoral-piter.firebasestorage.app",
+    messagingSenderId: "894995256520",
+    appId: "1:894995256520:web:8c0f1e72404739bb6d41fd"
+  };
+
+  myId = localStorage.getItem('porra_piter_id');
+  if (!myId){
+    myId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ('p_'+Date.now()+'_'+Math.random().toString(36).slice(2));
+    localStorage.setItem('porra_piter_id', myId);
+  }
+
+  if (!firebaseConfig.apiKey || firebaseConfig.apiKey.indexOf('PEGA_AQUI') === 0){
+    document.getElementById('config-warn').style.display = 'block';
+  } else {
+    try{
+      firebase.initializeApp(firebaseConfig);
+      dbApi = firebase.firestore();
+      authApi = firebase.auth();
+    }catch(e){
+      console.error(e);
+      document.getElementById('config-warn').style.display = 'block';
+    }
+  }
+
+  renderAll();
+  renderRoundBadge();
+
+  if (dbApi){
+    dbApi.collection('predictions').onSnapshot(function(snap){
+      predictions = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+      setHeaderStat(); renderPredictNotice(); renderParticipants(); renderResults();
+    }, function(err){ console.error(err); });
+    dbApi.doc('results/actual').onSnapshot(function(snap){
+      results = snap.exists ? snap.data() : null;
+      setHeaderStat(); renderPredictNotice(); renderResults(); refreshAdminFromResults();
+    }, function(err){ console.error(err); });
+    dbApi.collection('polls').onSnapshot(function(snap){
+      polls = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+      renderPolls();
+    }, function(err){ console.error(err); });
+    dbApi.doc('settings/round').onSnapshot(function(snap){
+      currentRoundName = (snap.exists && snap.data().name) ? snap.data().name : "Recién convocadas";
+      renderRoundBadge(); renderPredictNotice();
+    }, function(err){ console.error(err); });
+  }
+
+  if (authApi){
+    authApi.onAuthStateChanged(function(user){
+      canEdit = !!(user && user.email === ADMIN_EMAIL);
+      document.getElementById('admin-login-form').style.display = 'none';
+      document.getElementById('admin-login-toggle').style.display = canEdit ? 'none' : '';
+      document.getElementById('admin-signed-in').style.display = canEdit ? 'block' : 'none';
+      if (canEdit){
+        buildAdminPanelOnce();
+      } else {
+        adminBuilt = false;
+        document.getElementById('admin-panel').innerHTML = '';
+      }
+      renderPolls();
+    });
+  }
+})();
+</script>
+</body>
+</html>
