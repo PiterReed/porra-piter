@@ -173,8 +173,12 @@
   /* polls */
   .pollcard{ border:1px solid var(--border); border-radius:12px; padding:16px 18px; margin-bottom:12px; background:var(--surface-raised); }
   .pollcard:last-child{ margin-bottom:0; }
-  .pollhead{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
-  .pollhead .who{ font-weight:600; font-size:14px; }
+  .pollhead{ display:flex; align-items:center; gap:10px; cursor:pointer; list-style:none; }
+  .pollhead::-webkit-details-marker{ display:none; }
+  .pollhead::before{ content:''; width:7px; height:7px; flex:none; border-right:2px solid var(--text-muted); border-bottom:2px solid var(--text-muted); transform:rotate(-45deg); transition:transform .15s; margin-right:4px; }
+  details[open] > .pollhead::before{ transform:rotate(45deg); }
+  .pollhead .who{ flex:1; font-weight:600; font-size:14px; }
+  .pollbody{ margin-top:12px; }
   .pollhead .when{ font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text-muted); }
   .pollstack{ display:flex; width:100%; height:30px; border-radius:7px; overflow:hidden; background:var(--border); }
   .pollstack .seg{ flex:0 0 auto; height:100%; display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:700; overflow:hidden; white-space:nowrap; }
@@ -475,8 +479,25 @@
     });
     updateChamberUI(prefix, chamberId);
   }
+  // Limita el valor de un input al máximo de escaños aún disponibles en su cámara
+  function clampSeatInput(el){
+    if (el.value === '') return;
+    const prefix = el.dataset.prefix, chamberId = el.dataset.chamber;
+    const total = CHAMBERS[chamberId].total;
+    let v = parseInt(el.value, 10);
+    if (isNaN(v) || v < 0) v = 0;
+    let others = 0;
+    PARTY_ORDER.forEach(function(p){
+      const other = document.getElementById(prefix+'_'+chamberId+'_'+pid(p));
+      if (other && other !== el) others += parseInt(other.value, 10) || 0;
+    });
+    const available = Math.max(0, total - others);
+    if (v > available) v = available;
+    if (String(v) !== el.value) el.value = v;
+  }
   document.addEventListener('input', function(e){
     if (!e.target.classList.contains('seatinput')) return;
+    clampSeatInput(e.target);
     updateChamberUI(e.target.dataset.prefix, e.target.dataset.chamber);
     if (e.target.dataset.prefix === 'pred') renderPredictChecklist();
   });
@@ -774,6 +795,7 @@
     });
   }
 
+  const openPolls = {};
   function renderPolls(){
     const listHost = document.getElementById('polls-list');
     const adminHost = document.getElementById('polls-admin');
@@ -791,13 +813,18 @@
           return '<span class="seg" style="width:'+v+'%; background:'+PARTY_COLOR[p]+'; color:'+textColorFor(p)+'" title="'+p+': '+v+'%">'+label+'</span>';
         }).join('');
         const del = canEdit ? ' <button type="button" class="btn ghost small" data-pollid="'+poll.id+'" onclick="return false;" data-delpoll="1">Borrar</button>' : '';
-        return '<div class="pollcard" data-pollid="'+poll.id+'">'+
-          '<div class="pollhead"><span class="who">'+escapeHtml(poll.pollster)+'</span><span class="when mono">'+fmtDay(poll.date)+'</span></div>'+
-          '<div class="pollstack">'+segs+'</div>' +
-          (poll.source ? '<div class="pollsrc"><a href="'+poll.source+'" target="_blank" rel="noopener">Fuente</a></div>' : '') +
-          (canEdit ? '<div style="margin-top:8px;">'+del+'</div>' : '') +
-        '</div>';
+        return '<details class="pollcard" data-pollid="'+poll.id+'"'+(openPolls[poll.id]?' open':'')+'>'+
+          '<summary class="pollhead"><span class="who">'+escapeHtml(poll.pollster)+'</span><span class="when mono">'+fmtDay(poll.date)+'</span></summary>'+
+          '<div class="pollbody">'+
+            '<div class="pollstack">'+segs+'</div>' +
+            (poll.source ? '<div class="pollsrc"><a href="'+poll.source+'" target="_blank" rel="noopener">Fuente</a></div>' : '') +
+            (canEdit ? '<div style="margin-top:8px;">'+del+'</div>' : '') +
+          '</div>'+
+        '</details>';
       }).join('');
+      listHost.querySelectorAll('details.pollcard').forEach(function(d){
+        d.addEventListener('toggle', function(){ openPolls[d.dataset.pollid] = d.open; });
+      });
       if (canEdit){
         listHost.querySelectorAll('[data-delpoll]').forEach(function(btn){
           btn.addEventListener('click', async function(){
