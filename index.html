@@ -202,6 +202,7 @@
     </div>
     <nav class="tabs">
       <button data-tab="predict" class="active">Tu predicción</button>
+      <button data-tab="polls">Encuestas</button>
       <button data-tab="participants">Participantes</button>
       <button data-tab="results">Resultados y ranking</button>
     </nav>
@@ -216,14 +217,7 @@
         <p>La idea es pasarlo bien. Esta porra nace para ser algo ligero y divertido, no para generar confrontación, sino para abrir debate y comparar quién acierta más (y quién se columpia). Gana quien más se acerque, no quien más grite. 😄</p>
         <p>Sobre el nombre: no hace falta que pongas tu nombre real. Puedes usar cualquier cosa con la que te identifiques o que te apetezca: un alias, un mote, el nombre de tu peña... Eso sí, lo que escribas ahí será público, así que elígelo con cabeza.</p>
         <p>¡Mucha suerte con tus predicciones!</p>
-      </div>
-
-      <div class="card" id="polls-card">
-        <h2>Encuestas recientes</h2>
-        <p class="sub">Estimación de voto (%) de cada encuesta, para que te guíes al predecir. Pasa el cursor sobre la barra para ver cada partido y su porcentaje.</p>
-        <div class="legend" id="polls-legend"></div>
-        <div id="polls-admin"></div>
-        <div id="polls-list"></div>
+        <button type="button" class="btn small" id="goto-polls-btn" style="margin-top:14px;">Encuestas</button>
       </div>
 
       <div class="card">
@@ -278,6 +272,19 @@
           </div>
           <p class="sub" style="margin-top:12px; margin-bottom:0;">Máximo posible: 200 puntos. Solo cuenta la última ronda que guardes antes de que se publiquen los resultados oficiales.</p>
         </details>
+      </div>
+    </section>
+
+    <!-- POLLS -->
+    <section class="panel" id="panel-polls">
+      <div class="hero">
+        <h1>Encuestas recientes.</h1>
+        <p>Estimación de voto (%) de cada encuesta, para que te guíes al predecir. Pasa el cursor sobre la barra para ver cada partido y su porcentaje.</p>
+      </div>
+      <div class="card" id="polls-card">
+        <div class="legend" id="polls-legend"></div>
+        <div id="polls-admin"></div>
+        <div id="polls-list"></div>
       </div>
     </section>
 
@@ -560,14 +567,15 @@
     return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
   }
 
+  function selectTab(tab){
+    document.querySelectorAll('nav.tabs button').forEach(function(b){ b.classList.toggle('active', b.dataset.tab === tab); });
+    document.querySelectorAll('section.panel').forEach(function(p){ p.classList.remove('active'); });
+    document.getElementById('panel-'+tab).classList.add('active');
+  }
   document.querySelectorAll('nav.tabs button').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      document.querySelectorAll('nav.tabs button').forEach(function(b){ b.classList.remove('active'); });
-      document.querySelectorAll('section.panel').forEach(function(p){ p.classList.remove('active'); });
-      btn.classList.add('active');
-      document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
-    });
+    btn.addEventListener('click', function(){ selectTab(btn.dataset.tab); });
   });
+  document.getElementById('goto-polls-btn').addEventListener('click', function(){ selectTab('polls'); });
 
   let dbApi=null, authApi=null, myId=null, canEdit=false;
   let predictions=[], results=null, polls=[];
